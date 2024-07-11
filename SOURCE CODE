@@ -1,0 +1,243 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.Stack;
+
+public class ScientificCalculator {
+    private JFrame frame;
+    private JTextField display;
+    private JButton[] buttons;
+    private String[] buttonLabels = {
+        "C", "<-", "=", 
+        "7", "8", "9",
+        "4", "5", "6",
+        "1", "2", "3",
+        ".", "0","+",
+        "/", "*","-",
+    };
+    private String[] functionLabels = {
+        "sin", "cos", "tan", "sqrt",
+        "log", "ln", "exp", "pow",
+        "asin", "acos", "atan", "cosh",
+        "sinh", "tanh", "abs", "ceil",
+        "floor", "round", "expm1", "log1p",
+        "sec", "csc", "cot", "asec",
+        "acsc", "acot", "hypot", "deg"
+    };
+    private JButton[] functionButtons;
+
+    public ScientificCalculator() {
+        frame = new JFrame("Scientific Calculator");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLayout(new BorderLayout());
+
+        display = new JTextField(20);
+        display.setEditable(false);
+        frame.add(display, BorderLayout.NORTH);
+
+        JPanel buttonPanel = new JPanel(new GridLayout(6, 4));
+        buttons = new JButton[buttonLabels.length];
+        for (int i = 0; i < buttonLabels.length; i++) {
+            buttons[i] = new JButton(buttonLabels[i]);
+            buttons[i].addActionListener(new ButtonListener());
+            buttonPanel.add(buttons[i]);
+        }
+        frame.add(buttonPanel, BorderLayout.CENTER);
+
+        JPanel functionPanel = new JPanel(new GridLayout(8, 4));
+        functionButtons = new JButton[functionLabels.length];
+        for (int i = 0; i < functionLabels.length; i++) {
+            functionButtons[i] = new JButton(functionLabels[i]);
+            functionButtons[i].addActionListener(new FunctionListener());
+            functionPanel.add(functionButtons[i]);
+        }
+        frame.add(functionPanel, BorderLayout.EAST);
+
+        frame.pack();
+        frame.setVisible(true);
+    }
+
+    private class ButtonListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            String command = e.getActionCommand();
+            if (command.equals("=")) {
+                evaluateExpression();
+            } else if (command.equals("C")) {
+                clearDisplay();
+            } else if (command.equals("<-")) {
+                backspace();
+            } else if (command.equals("+") || command.equals("-") || command.equals("*") || command.equals("/")) {
+                addTerm(command);
+            } else {
+                display.setText(display.getText() + command);
+            }
+        }
+    }
+
+    private class FunctionListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            String command = e.getActionCommand();
+            String currentText = display.getText();
+            if (currentText.isEmpty()) return;
+            display.setText(command + "(" + currentText + ")");
+        }
+    }
+
+    private void addTerm(String operator) {
+        display.setText(display.getText() + " " + operator + " ");
+    }
+
+    private void clearDisplay() {
+        display.setText("");
+    }
+
+    private void backspace() {
+        String currentText = display.getText();
+        if (currentText.length() > 0) {
+            display.setText(currentText.substring(0, currentText.length() - 1));
+        }
+    }
+
+    private void evaluateExpression() {
+        String expression = display.getText();
+        try {
+            double result = evaluate(expression);
+            display.setText("Ans = " + result);
+        } catch (Exception e) {
+            display.setText("Error: Invalid expression.");
+        }
+    }
+
+    private double evaluate(String expression) throws Exception {
+        // Convert infix expression to postfix
+        String postfix = infixToPostfix(expression);
+        // Evaluate postfix expression
+        return evaluatePostfix(postfix);
+    }
+
+    private String infixToPostfix(String expression) {
+        StringBuilder result = new StringBuilder();
+        Stack<String> stack = new Stack<>();
+        String[] tokens = expression.split(" ");
+        for (String token : tokens) {
+            if (isNumeric(token)) {
+                result.append(token).append(" ");
+            } else if (isFunction(token)) {
+                stack.push(token);
+            } else if (token.equals("(")) {
+                stack.push(token);
+            } else if (token.equals(")")) {
+                while (!stack.isEmpty() && !stack.peek().equals("(")) {
+                    result.append(stack.pop()).append(" ");
+                }
+                if (!stack.isEmpty() && stack.peek().equals("(")) {
+                    stack.pop();
+                }
+            } else {
+                while (!stack.isEmpty() && precedence(token) <= precedence(stack.peek())) {
+                    result.append(stack.pop()).append(" ");
+                }
+                stack.push(token);
+            }
+        }
+        while (!stack.isEmpty()) {
+            result.append(stack.pop()).append(" ");
+        }
+        return result.toString().trim();
+    }
+
+    private boolean isNumeric(String str) {
+        try {
+            Double.parseDouble(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private boolean isFunction(String token) {
+        for (String func : functionLabels) {
+            if (func.equals(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int precedence(String op) {
+        switch (op) {
+            case "+": case "-":
+                return 1;
+            case "*": case "/":
+                return 2;
+            default:
+                return 0;
+        }
+    }
+
+    private double evaluatePostfix(String postfix) throws Exception {
+        Stack<Double> stack = new Stack<>();
+        String[] tokens = postfix.split(" ");
+        for (String token : tokens) {
+            if (isNumeric(token)) {
+                stack.push(Double.parseDouble(token));
+            } else if (isFunction(token)) {
+                double value = stack.pop();
+                stack.push(applyFunction(token, value));
+            } else {
+                double b = stack.pop();
+                double a = stack.pop();
+                stack.push(applyOperator(token, a, b));
+            }
+        }
+        return stack.pop();
+    }
+
+    private double applyFunction(String function, double value) {
+        switch (function) {
+            case "sin": return Math.sin(Math.toRadians(value));
+            case "cos": return Math.cos(Math.toRadians(value));
+            case "tan": return Math.tan(Math.toRadians(value));
+            case "sqrt": return Math.sqrt(value);
+            case "log": return Math.log10(value);
+            case "ln": return Math.log(value);
+            case "exp": return Math.exp(value);
+            case "pow": return Math.pow(value, 2); // assuming 'pow' means squaring
+            case "asin": return Math.toDegrees(Math.asin(value));
+            case "acos": return Math.toDegrees(Math.acos(value));
+            case "atan": return Math.toDegrees(Math.atan(value));
+            case "cosh": return Math.cosh(value);
+            case "sinh": return Math.sinh(value);
+            case "tanh": return Math.tanh(value);
+            case "abs": return Math.abs(value);
+            case "ceil": return Math.ceil(value);
+            case "floor": return Math.floor(value);
+            case "round": return Math.round(value);
+            case "expm1": return Math.expm1(value);
+            case "log1p": return Math.log1p(value);
+            case "sec": return 1 / Math.cos(Math.toRadians(value));
+            case "csc": return 1 / Math.sin(Math.toRadians(value));
+            case "cot": return 1 / Math.tan(Math.toRadians(value));
+            case "asec": return Math.toDegrees(Math.acos(1 / value));
+            case "acsc": return Math.toDegrees(Math.asin(1 / value));
+            case "acot": return Math.toDegrees(Math.atan(1 / value));
+            case "hypot": return Math.hypot(value, 0); // assuming second operand is 0
+            case "deg": return Math.toDegrees(value);
+            default: return value;
+        }
+    }
+
+    private double applyOperator(String operator, double a, double b) {
+        switch (operator) {
+            case "+": return a + b;
+            case "-": return a - b;
+            case "*": return a * b;
+            case "/": return a / b;
+            default: return 0;
+        }
+    }
+
+    public static void main(String[] args) {
+        new ScientificCalculator();
+    }
+}
